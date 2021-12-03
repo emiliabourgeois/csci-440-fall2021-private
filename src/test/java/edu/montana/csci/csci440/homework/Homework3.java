@@ -66,7 +66,10 @@ public class Homework3 extends DBTest {
     public void selectPopularTracksAndTheirAlbums() throws SQLException {
 
         // HINT: join to invoice items and do a group by/having to get the right answer
-        List<Map<String, Object>> tracks = executeSQL("");
+        List<Map<String, Object>> tracks = executeSQL("SELECT invoice_items.TrackId, COUNT(invoice_items.Quantity) as Q FROM invoice_items\n" +
+                "JOIN tracks ON tracks.TrackId = invoice_items.TrackId\n" +
+                "GROUP BY invoice_items.TrackId\n" +
+                "HAVING Q > 1;");
         assertEquals(256, tracks.size());
 
         // HINT: join to tracks and invoice items and do a group by/having to get the right answer
@@ -84,7 +87,9 @@ public class Homework3 extends DBTest {
      * */
     public void selectCustomersMeetingCriteria() throws SQLException {
         // HINT: join to invoice items and do a group by/having to get the right answer
-        List<Map<String, Object>> tracks = executeSQL("" );
+        List<Map<String, Object>> tracks = executeSQL("SELECT Email\n" +
+                "FROM customers\n" +
+                "WHERE SupportRepId IN (SELECT SupportRepId from employees WHERE SupportRepId=3)" );
         assertEquals(21, tracks.size());
     }
 

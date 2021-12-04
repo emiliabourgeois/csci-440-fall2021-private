@@ -33,16 +33,16 @@ public class Homework3 extends DBTest {
 
         try(Connection connection = DB.connect()){
             connection.setAutoCommit(false);
-            PreparedStatement subtract = connection.prepareStatement("TODO");
-            subtract.setLong(1, 0);
-            subtract.setLong(2, 0);
+            PreparedStatement subtract = connection.prepareStatement("UPDATE tracks SET Milliseconds = Milliseconds - ? WHERE TrackId = ?");
+            subtract.setLong(1, 10);
+            subtract.setLong(2, 1);
             subtract.execute();
 
-            PreparedStatement add = connection.prepareStatement("TODO");
-            subtract.setLong(1, 0);
-            subtract.setLong(2, 0);
+            PreparedStatement add = connection.prepareStatement("UPDATE tracks SET Milliseconds = Milliseconds + ? WHERE TrackId = ?");
+            subtract.setLong(1, -10);
+            subtract.setLong(2, 2);
             subtract.execute();
-
+            connection.commit();
             // commit with the connection
         }
 
@@ -66,15 +66,20 @@ public class Homework3 extends DBTest {
     public void selectPopularTracksAndTheirAlbums() throws SQLException {
 
         // HINT: join to invoice items and do a group by/having to get the right answer
-        List<Map<String, Object>> tracks = executeSQL("SELECT invoice_items.TrackId, COUNT(invoice_items.Quantity) as Q FROM invoice_items\n" +
+        List<Map<String, Object>> tracks = executeSQL("SELECT tracks.Name as Count FROM invoice_items\n" +
                 "JOIN tracks ON tracks.TrackId = invoice_items.TrackId\n" +
                 "GROUP BY invoice_items.TrackId\n" +
-                "HAVING Q > 1;");
+                "HAVING COUNT(invoice_items.Quantity) > 1");
         assertEquals(256, tracks.size());
 
         // HINT: join to tracks and invoice items and do a group by/having to get the right answer
         //       note: you will need to use the DISTINCT operator to get the right result!
-        List<Map<String, Object>> albums = executeSQL("");
+        List<Map<String, Object>> albums = executeSQL("SELECT Title, AlbumId\n" +
+                "from albums\n" +
+                "WHERE AlbumId in (SELECT tracks.AlbumId as Count FROM invoice_items\n" +
+                "JOIN tracks ON tracks.TrackId = invoice_items.TrackId\n" +
+                "GROUP BY invoice_items.TrackId\n" +
+                "HAVING COUNT(invoice_items.Quantity) > 1);");
         assertEquals(166, albums.size());
     }
 

@@ -57,23 +57,30 @@ public class Album extends Model {
         return artistId;
     }
 
+    public void setArtistId(Artist artist){
+        this.artistId=artist.getArtistId();
+    }
+    public void setArtistId(Long artistId) { this.artistId = artistId;}
+
     public static List<Album> all() {
         return all(0, Integer.MAX_VALUE);
     }
 
     @Override
     public boolean create() {
-        try (Connection conn = DB.connect();
-             PreparedStatement stmt = conn.prepareStatement(
-                     "INSERT INTO albums (AlbumId,Title) VALUES (?,?)"
-             )) {
-            long all = this.all().size();
-            this.albumId = all+1;
-            stmt.setLong(1, this.albumId);
-            stmt.setString(2, this.title);
-            stmt.executeUpdate();
-            return true;
-        } catch (SQLException sqlException) {
+        if (verify()) {
+            try (Connection conn = DB.connect();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "INSERT INTO albums (title, artistId) VALUES (?, ?)")) {
+                stmt.setString(1, this.getTitle());
+                stmt.setLong(2, this.getArtistId());
+                stmt.executeUpdate();
+                albumId = DB.getLastID(conn);
+                return true;
+            } catch (SQLException sqlException) {
+                throw new RuntimeException(sqlException);
+            }
+        } else {
             return false;
         }
     }
@@ -121,7 +128,18 @@ public class Album extends Model {
             throw new RuntimeException(sqlException);
         }
     }
-
+    @Override
+    public void delete() {
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "DELETE FROM albums WHERE AlbumId=? and ArtistId=?")) {
+            stmt.setLong(1, this.getAlbumId());
+            stmt.setLong(2, this.getArtistId());
+            stmt.executeUpdate();
+        } catch (SQLException sqlException) {
+            throw new RuntimeException(sqlException);
+        }
+    }
     public static Album find(long i) {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement("SELECT * FROM albums WHERE AlbumId=?")) {

@@ -18,15 +18,27 @@ public class Playlist extends Model {
     public Playlist() {
     }
 
-    private Playlist(ResultSet results) throws SQLException {
+    Playlist(ResultSet results) throws SQLException {
         name = results.getString("Name");
         playlistId = results.getLong("PlaylistId");
     }
 
 
     public List<Track> getTracks(){
-        // TODO implement, order by track name
-        return Collections.emptyList();
+            try (Connection conn = DB.connect();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "select * from tracks where TrackId IN (SELECT TrackId FROM playlist_track WHERE PlaylistId = ?) ORDER BY Name"
+                 )) {
+                stmt.setLong(1, this.getPlaylistId());
+                ResultSet results = stmt.executeQuery();
+                List<Track> resultList = new LinkedList<>();
+                while (results.next()) {
+                    resultList.add(new Track(results));
+                }
+                return resultList;
+            } catch (SQLException sqlException) {
+                throw new RuntimeException(sqlException);
+            }
     }
 
     public Long getPlaylistId() {
@@ -48,9 +60,10 @@ public class Playlist extends Model {
     public static List<Playlist> all(int page, int count) {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT * FROM playlists LIMIT ?"
+                     "SELECT * FROM playlists LIMIT ? offset ?"
              )) {
             stmt.setInt(1, count);
+            stmt.setInt(2, (page-1)*count);
             ResultSet results = stmt.executeQuery();
             List<Playlist> resultList = new LinkedList<>();
             while (results.next()) {

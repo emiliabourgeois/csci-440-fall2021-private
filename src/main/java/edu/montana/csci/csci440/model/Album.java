@@ -61,12 +61,56 @@ public class Album extends Model {
         return all(0, Integer.MAX_VALUE);
     }
 
+    @Override
+    public boolean create() {
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "INSERT INTO albums (AlbumId,Title) VALUES (?,?)"
+             )) {
+            long all = this.all().size();
+            this.albumId = all+1;
+            stmt.setLong(1, this.albumId);
+            stmt.setString(2, this.title);
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException sqlException) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean update(){
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "UPDATE albums SET Title=? WHERE AlbumId=?"
+             )) {
+            stmt.setString(1, this.title);
+            stmt.setLong(2, this.albumId);
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException sqlException) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean verify() {
+        _errors.clear(); // clear any existing errors
+        if (title == null || "".equals(title)) {
+            addError("Title can't be null or blank!");
+        }
+        if (artistId == null || 0 ==artistId) {
+            addError("Title can't be null or blank!");
+        }
+        return !hasErrors();
+    }
     public static List<Album> all(int page, int count) {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT * FROM albums LIMIT ?"
+                     "SELECT * FROM albums LIMIT ? offset ?"
              )) {
             stmt.setInt(1, count);
+            stmt.setInt(2, ((page-1)*count));
             ResultSet results = stmt.executeQuery();
             List<Album> resultList = new LinkedList<>();
             while (results.next()) {

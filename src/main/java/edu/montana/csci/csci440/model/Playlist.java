@@ -27,7 +27,7 @@ public class Playlist extends Model {
     public List<Track> getTracks(){
             try (Connection conn = DB.connect();
                  PreparedStatement stmt = conn.prepareStatement(
-                         "select * from tracks where TrackId IN (SELECT TrackId FROM playlist_track WHERE PlaylistId = ?) ORDER BY Name"
+                         "SELECT *, Title as AlbumTitle, artists.Name as ArtistName From tracks Join albums on tracks.AlbumId = albums.AlbumId Join artists on albums.ArtistId = artists.ArtistId WHERE TrackId IN (SELECT TrackId FROM playlist_track WHERE PlaylistId = ?) ORDER BY Name"
                  )) {
                 stmt.setLong(1, this.getPlaylistId());
                 ResultSet results = stmt.executeQuery();

@@ -25,6 +25,8 @@ public class Track extends Model {
     private Long milliseconds;
     private Long bytes;
     private BigDecimal unitPrice;
+    private String AlbumTitle;
+    private String ArtistName;
 
     public static final String REDIS_CACHE_KEY = "cs440-tracks-count-cache";
 
@@ -45,11 +47,16 @@ public class Track extends Model {
         albumId = results.getLong("AlbumId");
         mediaTypeId = results.getLong("MediaTypeId");
         genreId = results.getLong("GenreId");
+        AlbumTitle = results.getString("AlbumTitle");
+        ArtistName = results.getString("ArtistName");
     }
 
     public static Track find(long i) {
         try (Connection conn = DB.connect();
-             PreparedStatement stmt = conn.prepareStatement("SELECT * FROM tracks WHERE TrackId=?")) {
+             PreparedStatement stmt = conn.prepareStatement("SELECT *, Title as AlbumTitle, artists.Name as ArtistName FROM tracks\n" +
+                     "Join albums on tracks.AlbumId = albums.AlbumId\n" +
+                     "Join artists on albums.ArtistId = artists.ArtistId\n" +
+                     "WHERE TrackId=?")) {
             stmt.setLong(1, i);
             ResultSet results = stmt.executeQuery();
             if (results.next()) {
@@ -64,17 +71,21 @@ public class Track extends Model {
 
     public static Long count() {
         Jedis redisClient = new Jedis(); // use this class to access redis and create a cache
-        try (Connection conn = DB.connect();
-             PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(*) as Count FROM tracks")) {
-            ResultSet results = stmt.executeQuery();
-            if (results.next()) {
-                return results.getLong("Count");
-            } else {
-                throw new IllegalStateException("Should find a count!");
+        String s = redisClient.get(REDIS_CACHE_KEY);
+        if(s == null) {
+            try (Connection conn = DB.connect();
+                 PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(*) as Count FROM tracks")) {
+                 ResultSet results = stmt.executeQuery();
+                 if (results.next()) {
+                    redisClient.set(REDIS_CACHE_KEY, String.valueOf(results.getLong("Count")));
+                    return results.getLong("Count");
+                 } else {
+                    throw new IllegalStateException("Should find a count!");
+                 }
+            } catch (SQLException sqlException) {
+                throw new RuntimeException(sqlException);
             }
-        } catch (SQLException sqlException) {
-            throw new RuntimeException(sqlException);
-        }
+        }else {return Long.valueOf(s);}
     }
 
     public Album getAlbum() {
@@ -173,15 +184,11 @@ public class Track extends Model {
     }
 
     public String getArtistName() {
-        // TODO implement more efficiently
-        //  hint: cache on this model object
-        return getAlbum().getArtist().getName();
+        return ArtistName;
     }
 
     public String getAlbumTitle() {
-        // TODO implement more efficiently
-        //  hint: cache on this model object
-        return getAlbum().getTitle();
+        return AlbumTitle;
     }
 
     public static List<Track> advancedSearch(int page, int count,
@@ -266,12 +273,14 @@ public class Track extends Model {
     }
     @Override
     public boolean create() {
+        Jedis redisClient = new Jedis(); // use this class to access redis and create a cache
+        String s = redisClient.get(REDIS_CACHE_KEY);
+        redisClient.del(REDIS_CACHE_KEY);
         if (verify()) {
             try (Connection conn = DB.connect();
                  PreparedStatement stmt = conn.prepareStatement(
                          "INSERT INTO tracks (TrackId, Name, AlbumId, MediaTypeId, GenreId, Milliseconds, Bytes, UnitPrice) VALUES (?, ?, ?, ?, ?, ? , ? , ?)")) {
-                long all = this.all().size();
-                this.trackId = all + 1;
+                this.trackId = DB.getLastID(conn);
                 stmt.setLong(1, this.getTrackId());
                 stmt.setString(2, this.getName());
                 stmt.setLong(3, this.getAlbumId());
@@ -330,7 +339,7 @@ public class Track extends Model {
     public static List<Track> all(int page, int count, String orderBy) {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT * FROM tracks Order By " + orderBy + " LIMIT ? OFFSET ?"
+                     "SELECT *, Title as AlbumTitle, artists.Name as ArtistName From tracks Join albums on tracks.AlbumId = albums.AlbumId Join artists on albums.ArtistId = artists.ArtistId Order By " + orderBy + " LIMIT ? OFFSET ?"
              )) {
             stmt.setInt(1, count);
             stmt.setInt(2,(page-1)*count);
